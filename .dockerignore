@@ -1,0 +1,20 @@
+# Exclude git, docs, local specs, and secrets from Docker build contexts
+.git
+.github
+.githooks
+.cursor
+.env
+.env.*
+*.docx
+*.md
+вспомогателньые
+вспомогательные
+secrets
+tests
+node_modules
+bin
+dist
+*.exe
+*.out
+*.pem
+*.key

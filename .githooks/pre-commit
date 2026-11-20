@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+echo "[pre-commit] Running secret and leak guard..."
+
+if command -v go >/dev/null 2>&1; then
+  go run ./scripts/secret_guard.go --staged
+else
+  echo "[pre-commit] ERROR: 'go' is not found in PATH. Cannot verify staged files for secrets."
+  exit 1
+fi

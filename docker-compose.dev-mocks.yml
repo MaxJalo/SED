@@ -1,0 +1,30 @@
+services:
+  mock-external:
+    build:
+      context: ./devtools/mock-external
+    restart: unless-stopped
+    environment:
+      MOCK_EXTERNAL_PORT: ${MOCK_EXTERNAL_PORT:-8092}
+      MOCK_ONEC_FAIL_MODE: ${MOCK_ONEC_FAIL_MODE:-false}
+    ports:
+      - "${MOCK_EXTERNAL_PORT:-8092}:8092"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8092/healthz >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    depends_on:
+      mock-external:
+        condition: service_healthy
+    environment:
+      ORCH_BASE_URL: http://mock-external:8092
+
+  worker:
+    depends_on:
+      mock-external:
+        condition: service_healthy
+    environment:
+      ORCH_BASE_URL: http://mock-external:8092
+      ONEC_BASE_URL: http://mock-external:8092/onec

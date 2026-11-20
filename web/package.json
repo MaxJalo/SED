@@ -1,0 +1,11 @@
+{
+  "name": "sed-web-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Full Web Client and Adaptive Thin Web Mode for SED (/v1)",
+  "scripts": {
+    "dev": "echo \"Stage 4: Web & Thin client Vite dev server\"",
+    "build": "echo \"Stage 4: Web & Thin client production build\"",
+    "test": "echo \"See tests/web-client and tests/thin-client\""
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@sed/thick-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript SDK adapter for embedding SED (/v1) into desktop host application",
+  "scripts": {
+    "build": "echo \"Stage 4: Thick adapter build\"",
+    "test": "echo \"See tests/thick-client\""
+  }
+}

@@ -1,0 +1,50 @@
+# Local corporate specifications & drafts (NEVER push to public repo)
+ТЗ_Сервис_Документооборота.md
+ТЗ_Сервис_Документооборота.docx
+*.docx
+*.doc
+вспомогателньые/
+вспомогательные/
+
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.jks
+secrets/
+*.local.json
+
+# Runtime & Docker data volumes
+data/
+storage/
+pgdata/
+*.db
+*.sqlite
+*.sql.gz
+*.dump
+
+# Go build & test artifacts
+bin/
+dist/
+*.exe
+*.test
+*.out
+coverage.txt
+
+# Node / Web build artifacts
+node_modules/
+web/dist/
+web/.vite/
+
+# OS & IDE noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+!.vscode/extensions.json
