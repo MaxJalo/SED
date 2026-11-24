@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "sed": {
+      "command": "go",
+      "args": ["run", "."],
+      "cwd": "${workspaceFolder}/services/mcp",
+      "env": {
+        "SED_API_URL": "http://localhost:8000",
+        "SED_TOKEN": "${env:SED_TOKEN}"
+      }
+    }
+  }
+}

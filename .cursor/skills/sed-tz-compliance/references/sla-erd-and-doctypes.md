@@ -23,7 +23,7 @@
 - `route` и `route_step`: шаблон (`is_template=true`) клонируется в экземпляр (`is_template=false`); статус паузы `Приостановлено` хранится на экземпляре маршрута.
 - `step_task`: хранит `version_id`, `file_id`, `deputy_for_user_id`, `delegated_from_user_id`, `started_at`, `plan_due_at`, `decided_at`, `remark_addressed`.
 - `tag`: иерархические (`parent_id`), `scope` = глобальный или локальный для подразделения (чужое подразделение локальные теги не видит).
-- `audit_log`: append-only (`просмотр`, `файл`, `переход`, `решение`, `право`, `поручение`, `важность`), защищён от `UPDATE`/`DELETE`.
+- `audit_log`: append-only (`изменение`, `файл`, `переход`, `решение`, `право`, `поручение`), защищён от `UPDATE`/`DELETE`. Просмотр карточки и скачивание файла не пишутся. Изменение реквизита хранит прежнее и новое значение.
 - `outbox_events`: `idempotency_key` (unique), `attempts`, `next_retry_at`, `status`.
 
 ## 3. Девять видов первой очереди (декларативные шаблоны)

@@ -145,3 +145,69 @@ func TestDirectoryIsolationByOrganization(t *testing.T) {
 		t.Fatalf("unexpected ORG-02 directory isolation result: %+v", body)
 	}
 }
+
+func TestPasswordLoginDoesNotBypassDirectoryClick(t *testing.T) {
+	st := store.NewDefaultStore()
+	st.UpsertPasswordUser(store.User{
+		UserID:           "admin",
+		FullName:         "Администратор",
+		OrganizationCode: "ORG-01",
+		Roles:            []string{"admin"},
+	}, "secret-pass")
+	ts := httptest.NewServer(httpapi.NewServer(st, []byte("test-signing-key-dev"), 30*time.Minute))
+	defer ts.Close()
+
+	raw, _ := json.Marshal(map[string]string{"user_id": "admin"})
+	resp, err := http.Post(ts.URL+"/dev/token", "application/json", bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("password account must not enter through /dev/token, got %d", resp.StatusCode)
+	}
+
+	bad, _ := json.Marshal(map[string]string{"login": "admin", "password": "wrong"})
+	resp, err = http.Post(ts.URL+"/dev/login", "application/json", bytes.NewReader(bad))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong password: expected 401, got %d", resp.StatusCode)
+	}
+
+	good, _ := json.Marshal(map[string]string{"login": "admin", "password": "secret-pass"})
+	resp, err = http.Post(ts.URL+"/dev/login", "application/json", bytes.NewReader(good))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var issued tokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&issued); err != nil {
+		t.Fatal(err)
+	}
+	if len(issued.User.Roles) != 1 || issued.User.Roles[0] != "admin" {
+		t.Fatalf("roles: %+v", issued.User.Roles)
+	}
+
+	dirResp, err := http.Get(ts.URL + "/dev/directory")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dirResp.Body.Close()
+	var dir struct {
+		Items []store.User `json:"items"`
+	}
+	if err := json.NewDecoder(dirResp.Body).Decode(&dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range dir.Items {
+		if item.UserID == "admin" {
+			t.Fatal("password account must stay out of the click list")
+		}
+	}
+}

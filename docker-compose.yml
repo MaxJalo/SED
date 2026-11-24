@@ -59,8 +59,11 @@ services:
       - api
     ports:
       - "${PROXY_PORT:-8000}:80"
+      - "${PROXY_TLS_PORT:-8443}:443"
     volumes:
       - ./deploy/reverse-proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/reverse-proxy/certs:/etc/nginx/certs:ro
+      - ./web/public:/usr/share/nginx/html:ro
 
 volumes:
   sed_pg_data:

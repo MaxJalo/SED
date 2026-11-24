@@ -2,6 +2,8 @@ package store
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"sync"
@@ -9,9 +11,10 @@ import (
 )
 
 var (
-	ErrUserNotFound    = errors.New("user not found")
-	ErrSessionRevoked  = errors.New("session revoked or unknown")
-	ErrUserBlocked     = errors.New("user is blocked")
+	ErrUserNotFound   = errors.New("user not found")
+	ErrSessionRevoked = errors.New("session revoked or unknown")
+	ErrUserBlocked    = errors.New("user is blocked")
+	ErrBadCredentials = errors.New("неверный логин или пароль")
 )
 
 type User struct {
@@ -36,15 +39,35 @@ type Session struct {
 }
 
 type Store struct {
-	mu       sync.RWMutex
-	users    map[string]User
-	order    []string
-	sessions map[string]*Session
-	blocked  map[string]bool
+	mu        sync.RWMutex
+	users     map[string]User
+	order     []string
+	sessions  map[string]*Session
+	blocked   map[string]bool
+	passwords map[string][]byte
 }
 
 func NewDefaultStore() *Store {
-	seed := []User{
+	return NewStore(defaultUsers())
+}
+
+func NewStore(users []User) *Store {
+	s := &Store{
+		users:     make(map[string]User, len(users)),
+		order:     make([]string, 0, len(users)),
+		sessions:  make(map[string]*Session),
+		blocked:   map[string]bool{},
+		passwords: map[string][]byte{},
+	}
+	for _, u := range users {
+		s.users[u.UserID] = u
+		s.order = append(s.order, u.UserID)
+	}
+	return s
+}
+
+func defaultUsers() []User {
+	return []User{
 		{
 			UserID:           "usr-org1-admin",
 			FullName:         "Администратор Системы",
@@ -154,18 +177,6 @@ func NewDefaultStore() *Store {
 			Roles:            []string{"author"},
 		},
 	}
-
-	s := &Store{
-		users:    make(map[string]User, len(seed)),
-		order:    make([]string, 0, len(seed)),
-		sessions: make(map[string]*Session),
-		blocked:  make(map[string]bool),
-	}
-	for _, u := range seed {
-		s.users[u.UserID] = u
-		s.order = append(s.order, u.UserID)
-	}
-	return s
 }
 
 func (s *Store) FindUserByID(userID string) (User, error) {
@@ -193,10 +204,21 @@ func (s *Store) FindUserByRole(role string) (User, error) {
 }
 
 func (s *Store) ListDirectory(orgCode string) []User {
+	return s.listDirectory(orgCode, false)
+}
+
+func (s *Store) ListPublicDirectory(orgCode string) []User {
+	return s.listDirectory(orgCode, true)
+}
+
+func (s *Store) listDirectory(orgCode string, hidePasswordUsers bool) []User {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	res := make([]User, 0, len(s.order))
 	for _, id := range s.order {
+		if hidePasswordUsers && s.passwords[id] != nil {
+			continue
+		}
 		u := s.users[id]
 		if orgCode != "" && u.OrganizationCode != orgCode {
 			continue
@@ -204,6 +226,38 @@ func (s *Store) ListDirectory(orgCode string) []User {
 		res = append(res, u)
 	}
 	return res
+}
+
+func (s *Store) UpsertPasswordUser(user User, password string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.users[user.UserID]; !ok {
+		s.order = append(s.order, user.UserID)
+	}
+	s.users[user.UserID] = user
+	sum := sha256.Sum256([]byte(password))
+	s.passwords[user.UserID] = append([]byte(nil), sum[:]...)
+}
+
+func (s *Store) HasPassword(userID string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.passwords[userID] != nil
+}
+
+func (s *Store) Authenticate(login, password string) (User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	user, ok := s.users[login]
+	sum := sha256.Sum256([]byte(password))
+	stored := s.passwords[login]
+	if !ok || stored == nil || subtle.ConstantTimeCompare(stored, sum[:]) != 1 {
+		return User{}, ErrBadCredentials
+	}
+	if s.blocked[login] {
+		return User{}, ErrUserBlocked
+	}
+	return user, nil
 }
 
 func (s *Store) CreateSession(userID string, ttl time.Duration, now time.Time) (Session, error) {

@@ -36,7 +36,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
+	s.mux.HandleFunc("GET /dev/directory", s.handleDevDirectory)
 	s.mux.HandleFunc("POST /dev/token", s.handleIssueToken)
+	s.mux.HandleFunc("POST /dev/login", s.handlePasswordLogin)
 	s.mux.HandleFunc("POST /dev/sessions/{jti}/revoke", s.handleRevokeSession)
 	s.mux.HandleFunc("POST /dev/users/{id}/block", s.handleBlockUser(true))
 	s.mux.HandleFunc("POST /dev/users/{id}/unblock", s.handleBlockUser(false))
@@ -77,7 +79,35 @@ func (s *Server) handleIssueToken(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	if s.store.HasPassword(user.UserID) {
+		writeError(w, http.StatusUnauthorized, "для этой учётной записи нужен пароль")
+		return
+	}
+	s.writeToken(w, user)
+}
 
+func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Login    string `json:"login"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+	user, err := s.store.Authenticate(strings.TrimSpace(req.Login), req.Password)
+	if err == store.ErrUserBlocked {
+		writeError(w, http.StatusForbidden, "user is blocked")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "неверный логин или пароль")
+		return
+	}
+	s.writeToken(w, user)
+}
+
+func (s *Server) writeToken(w http.ResponseWriter, user store.User) {
 	now := s.nowFn().UTC()
 	sess, err := s.store.CreateSession(user.UserID, s.tokenTTL, now)
 	if err != nil {
@@ -137,6 +167,12 @@ func (s *Server) handleBlockUser(blocked bool) http.HandlerFunc {
 			"blocked": blocked,
 		})
 	}
+}
+
+func (s *Server) handleDevDirectory(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": s.store.ListPublicDirectory(""),
+	})
 }
 
 func (s *Server) handleAuthMe(w http.ResponseWriter, r *http.Request) {

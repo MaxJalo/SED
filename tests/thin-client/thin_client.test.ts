@@ -1,2 +1,5 @@
-// Stage 4 Adaptive Thin Web Mode test placeholder
-export const thinClientTestSuiteReady = true;
+import { WVC_DESIGN_TOKENS, controlHeightForMode } from "../../clients/thick-adapter/src/index";
+
+export const thinClientTestSuiteReady =
+  WVC_DESIGN_TOKENS.radiusDialog === "16px" &&
+  controlHeightForMode("thin") === 36;

@@ -1,28 +1,43 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/Maxjalo/SED/services/worker/internal/outbox"
 )
 
 func main() {
-	log.Println("sed-worker scaffold started (SLA & Outbox worker)")
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	ticker := time.NewTicker(30 * time.Second)
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL is required")
+	}
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer pool.Close()
+
+	base := os.Getenv("ONEC_BASE_URL")
+	log.Printf("sed-worker started, outbox target %s", base)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-
 	for {
 		select {
-		case <-ticker.C:
-			log.Println("sed-worker heartbeat (Stage 0 scaffold)")
-		case sig := <-sigCh:
-			log.Printf("sed-worker shutting down on signal %v", sig)
+		case <-ctx.Done():
+			log.Println("sed-worker stopped")
 			return
+		case <-ticker.C:
+			outbox.Deliver(ctx, pool, base)
 		}
 	}
 }

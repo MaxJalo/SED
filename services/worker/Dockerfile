@@ -1,7 +1,8 @@
 FROM golang:1.24-alpine AS builder
 WORKDIR /src
-COPY go.mod ./
-COPY cmd ./cmd
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/sed-worker ./cmd/worker
 
 FROM alpine:3.21
